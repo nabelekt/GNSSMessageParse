@@ -1,3 +1,9 @@
+Note
+----
+This repository is a fork of https://github.com/stevemarple/MicroNMEA and is meant to build 
+on that one. Note that with added functionality, this library will use more program space than
+the original.
+
 MicroNMEA
 =========
 

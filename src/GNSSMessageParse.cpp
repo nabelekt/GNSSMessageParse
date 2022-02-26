@@ -1,4 +1,5 @@
-#include <MicroNMEA.h>
+#include <GNSSMessageParse.h>
+
 
 // Allow debugging/regression testing under normal g++ environment.
 #ifdef MICRONMEA_DEBUG
@@ -214,7 +215,6 @@ void MicroNMEA::clear(void)
 	_latitude = 999000000L;
 	_longitude = 999000000L;
 	_altitude = _speed = _course = LONG_MIN;
-	_altitudeValid = false;
 	_year = _month = _day = 0;
 	_hour = _minute = _second = 99;
 	_hundredths = 0;
@@ -223,6 +223,7 @@ void MicroNMEA::clear(void)
 
 bool MicroNMEA::process(char c)
 {
+	// Serial.println(c);
 	if (_buffer == nullptr || _bufferLen == 0)
 		return false;
 	if (c == '\0' || c == '\n' || c == '\r') {
@@ -230,26 +231,48 @@ bool MicroNMEA::process(char c)
 		*_ptr = '\0';
 		_ptr = _buffer;
 
-		if (*_buffer == '$' && testChecksum(_buffer)) {
+		// Serial.printf("\n%s", _buffer);
+		if (*_buffer == '$' && testChecksum(_buffer))  // If message is complete
+		{
+			Serial.println("\nValid message");
 			// Valid message
 			const char* data;
-			if (_buffer[1] == 'G') {
+			if (strncmp(&_buffer[1], "PUBX", 4) == 0)  // If message is a PUBX message
+			{
+				Serial.println("Processing PUBX!");
+				_talkerID = '\0';  // Only applies to NMEA messages
+				data = parseField(&_buffer[1], &_messageID[0], sizeof(_messageID));
+			}
+			else if (_buffer[1] == 'G')  // If message is a NMEA message
+			{
+				Serial.println("Processing NMEA!");
 				_talkerID = _buffer[2];
 				data = parseField(&_buffer[3], &_messageID[0], sizeof(_messageID));
 			}
-			else {
+			else
+			{
 				_talkerID = '\0';
 				data = parseField(&_buffer[1], &_messageID[0], sizeof(_messageID));
 			}
 
-			if (data != nullptr && strcmp(&_messageID[0], "GGA") == 0)
+			Serial.println(data != nullptr);
+			Serial.printf("%s\n", &_messageID[0]);
+			Serial.println(strcmp(&_messageID[0], "PUBX") == 0);
+			Serial.println(data != nullptr && strcmp(&_messageID[0], "PUBX") == 0);
+			if (data != nullptr && strcmp(&_messageID[0], "PUBX") == 0)
+			{
+				
+				return processPUBX(data);
+			}
+			else if (data != nullptr && strcmp(&_messageID[0], "GGA") == 0)
 				return processGGA(data);
 			else if (data != nullptr && strcmp(&_messageID[0], "RMC") == 0)
 				return processRMC(data);
 			else if (_unknownSentenceHandler)
 				(*_unknownSentenceHandler)(*this);
 		}
-		else {
+		else
+		{
 			if (_badChecksumHandler && *_buffer != '\0') // don't send empty buffers as bad checksums!
 				(*_badChecksumHandler)(*this);
 		}
@@ -331,7 +354,6 @@ bool MicroNMEA::processGGA(const char *s)
 	_altitude = parseFloat(s, 3, &s);
 	if (s == nullptr)
 		return false;
-	_altitudeValid = true;
 	// That's all we care about
 	return true;
 }
@@ -342,6 +364,49 @@ bool MicroNMEA::processRMC(const char* s)
 	// If GxGSV messages are received _talker_ID can be changed after
 	// other MicroNMEA sentences. Compatibility modes can set the talker
 	// ID to indicate GPS regardless of actual navigation system used.
+	_navSystem = _talkerID;
+
+	s = parseTime(s);
+	if (s == nullptr)
+		return false;
+	_isValid = (*s == 'A');
+	s += 2; // Skip validity and comma
+	_latitude = parseDegreeMinute(s, 2, &s);
+	if (s == nullptr)
+		return false;
+	if (*s == ',')
+		++s;
+	else {
+		if (*s == 'S')
+			_latitude *= -1;
+		s += 2; // Skip N/S and comma
+	}
+	_longitude = parseDegreeMinute(s, 3, &s);
+	if (s == nullptr)
+		return false;
+	if (*s == ',')
+		++s;
+	else {
+		if (*s == 'W')
+			_longitude *= -1;
+		s += 2; // Skip E/W and comma
+	}
+	_speed = parseFloat(s, 3, &s);
+	if (s == nullptr)
+		return false;
+	_course = parseFloat(s, 3, &s);
+	if (s == nullptr)
+		return false;
+	s = parseDate(s);
+	// That's all we care about
+	return true;
+}
+
+
+bool MicroNMEA::processPUBX(const char* s)
+{
+	Serial.println("Parsing PUBX!");
+
 	_navSystem = _talkerID;
 
 	s = parseTime(s);

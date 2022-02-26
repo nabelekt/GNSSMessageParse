@@ -121,18 +121,18 @@ public:
 	/**
 	 * @brief Get the latitude, in millionths of a degree
 	 * @details North is positive.
-	 * @return long
+	 * @return float
 	 */
-	long getLatitude(void) const {
+	float getLatitude(void) const {
 		return _latitude;
 	}
 
 	/**
 	 * @brief Get the longitude, in millionths of a degree
 	 * @details East is positive.
-	 * @return long
+	 * @return float
 	 */
-	long getLongitude(void) const {
+	float getLongitude(void) const {
 		return _longitude;
 	}
 
@@ -141,13 +141,10 @@ public:
 	 * @brief Get the altitude in millmetres
 	 *
 	 * @param alt Reference to long value where altitude is to be stored
-	 * @return true Altitude is valid
-	 * @return false Altitude not valid
+	 * @return float
 	 */
-	bool getAltitude(long &alt) const {
-		if (_altitudeValid)
-			alt = _altitude;
-		return _altitudeValid;
+	float getAltitude(void) const {
+			return _altitude;
 	}
 
 	/**
@@ -287,6 +284,7 @@ protected:
 
 	bool processGGA(const char *s);
 	bool processRMC(const char* s);
+	bool processPUBX(const char* s);
 
 private:
 	// Sentence buffer and associated pointers
@@ -303,14 +301,13 @@ private:
 	// Variables parsed and kept for user
 	char _navSystem;
 	bool _isValid;
-	long _latitude, _longitude; // In millionths of a degree
-	long _altitude; // In millimetres
-	bool _altitudeValid;
+	float _latitude, _longitude; // In millionths of a degree
+	float _altitude; // In millimetres
 	long _speed, _course;
 	uint16_t _year;
 	uint8_t _month, _day, _hour, _minute, _second, _hundredths;
 	uint8_t _numSat;
-	uint8_t _hdop;
+	float _hdop;
 
 	void (*_badChecksumHandler)(MicroNMEA &nmea);
 	void (*_unknownSentenceHandler)(MicroNMEA &nmea);
